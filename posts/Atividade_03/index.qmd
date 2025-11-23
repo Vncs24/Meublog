@@ -1,0 +1,70 @@
+---
+title: "Visualizando Regressão Linear com Python"
+author: "Vinícius Fernandes"
+date: "2025-11-23"
+categories: [python, code, Plotnine]
+image: "png-transparent-bar-chart-business-graph-business-growth-graph-infographic-vol-icon.png"
+jupyter: python3
+---
+
+Neste post, apresento uma análise visual de uma relação entre duas variáveis usando Python.
+O código lê os valores de X e Y de arquivos de texto, realiza uma regressão linear para encontrar a melhor linha que representa a tendência dos dados e gera um gráfico que mostra claramente os pontos e a linha de ajuste.
+Essa visualização é útil para identificar padrões, tendências ou correlações entre duas variáveis, de forma rápida e objetiva.
+
+**Explicação breve do código**
+O código realiza três etapas principais:
+
+Leitura dos dados: os arquivos `X.txt` e `y.txt` são lidos linha a linha, convertendo os valores para números float.
+Cálculo da regressão linear: a função `np.polyfit` encontra os coeficientes `a` e `b` da equação da reta `y = a + b*x` que melhor ajusta os pontos.
+Geração do gráfico: usando `plotnine`, os pontos são plotados (`geom_point`) e a linha de regressão (`geom_abline`) é adicionada ao gráfico. Por fim, o gráfico é salvo em PNG para publicação.
+
+Importação das bibliotecas
+```{python}
+#| context: session
+from plotnine import ggplot, aes, geom_point, geom_abline
+import pandas as pd
+import numpy as np
+from IPython.display import Image
+```
+
+Leitura dos dados
+```{python}
+#| context: session
+with open("X.txt") as f:
+    valores_x = [float(line.strip()) for line in f]
+
+with open("y.txt") as f:
+    valores_y = [float(line.strip()) for line in f]
+
+```
+
+Criar o DataFrame
+```{python}
+#| context: session
+df = pd.DataFrame({"x": valores_x, "y": valores_y})
+```
+
+Cálculo da regressão linear
+```{python}
+#| context: session
+b, a = np.polyfit(df['x'], df['y'], 1)
+
+```
+
+Criar o gráfico
+```{python}
+#| context: session
+plot = (
+    ggplot(df, aes("x", "y"))
+    + geom_point()
+    + geom_abline(intercept=a, slope=b)
+)
+```
+
+Salvar e exibir o gráfico
+```{python}
+#| context: session
+plot.save("grafico.png", dpi=300, width=6, height=4)
+Image("grafico.png")
+
+```

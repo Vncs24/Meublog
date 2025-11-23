@@ -1,0 +1,125 @@
+---
+title: "Mapa linha SPTrans"
+author: "Vinícius Fernandes"
+date: "2025-11-23"
+categories: [python, code, sptrans]
+image: "SPTrans_logo.png"
+jupyter: python3
+---
+
+Neste post, mostro como é possível visualizar, em tempo real, a posição de ônibus de uma linha específica em São Paulo.
+Utilizando dados da API do sistema Olho Vivo da SPTrans, o código coleta informações sobre as paradas e veículos ativos e gera um mapa interativo, permitindo acompanhar a circulação da linha de forma clara e visual.
+Esta visualização é útil para entender a distribuição de paradas, identificar veículos em movimento e explorar os dados de transporte público de forma dinâmica.
+
+**Explicação breve do código**
+
+O código em Python realiza três funções principais: autenticação, consulta de dados e geração do mapa.
+
+Autenticação: usa um token fornecido pela SPTrans para acessar a API.
+Consulta de dados: recupera o código da linha de ônibus, todas as paradas e a posição dos veículos em tempo real.
+Geração do mapa: utiliza a biblioteca `folium` para criar um mapa interativo, colocando marcadores azuis para as paradas e vermelhos para os veículos.
+Por fim, o mapa é salvo em um arquivo HTML, que pode ser incorporado em blogs ou visualizado diretamente no navegador.
+
+```{python}
+import requests
+import folium
+
+TOKEN = "2692e179ba171bd5ae0a43849d0692b2d578551930c3ae3d78bc097101349160"
+BASE = "http://api.olhovivo.sptrans.com.br/v2.1"
+session = requests.Session()
+
+def autenticar():
+    url = f"{BASE}/Login/Autenticar"
+    r = session.post(url, params={"token": TOKEN})
+    return r.text.lower() == "true"
+
+def get_codigo_linha(linha, sentido=None):
+    url = f"{BASE}/Linha/Buscar"
+    r = session.get(url, params={"termosBusca": linha})
+    data = r.json()
+    if not data:
+        return None
+    if sentido is None:
+        return data[0].get("cl")
+    for item in data:
+        if item.get("sl") == sentido:
+            return item.get("cl")
+    return data[0].get("cl")
+
+def get_paradas(codigo):
+    url = f"{BASE}/Parada/BuscarParadasPorLinha"
+    r = session.get(url, params={"codigoLinha": codigo})
+    return r.json() if r.ok else []
+
+def get_veiculos(codigo):
+    url = f"{BASE}/Posicao/Linha"
+    r = session.get(url, params={"codigoLinha": codigo})
+    data = r.json()
+    return data.get("vs", []) if data else []
+
+def gerar_mapa(linha):
+    if not autenticar():
+        print("Falha na autenticação. Verifique seu token.")
+        return
+
+    codigo1 = get_codigo_linha(linha, sentido=1)
+    codigo2 = get_codigo_linha(linha, sentido=2)
+
+    paradas = []
+    if codigo1:
+        paradas += get_paradas(codigo1)
+    if codigo2:
+        paradas += get_paradas(codigo2)
+
+    veiculos = []
+    if codigo1:
+        veiculos += get_veiculos(codigo1)
+    if codigo2:
+        veiculos += get_veiculos(codigo2)
+
+    if paradas:
+        lat0, lon0 = float(paradas[0]["py"]), float(paradas[0]["px"])
+    elif veiculos:
+        lat0, lon0 = float(veiculos[0]["py"]), float(veiculos[0]["px"])
+    else:
+        lat0, lon0 = -23.55, -46.63
+        print("Nenhuma parada ou veículo encontrado. Mapa centralizado em São Paulo.")
+
+    mapa = folium.Map(location=[lat0, lon0], zoom_start=13)
+
+    if paradas:
+        for p in paradas:
+            try:
+                lat, lon = float(p["py"]), float(p["px"])
+                folium.Marker(location=[lat, lon], popup=p.get("np",""), icon=folium.Icon(color="blue", icon="bus")).add_to(mapa)
+            except:
+                continue
+    else:
+        print("Nenhuma parada encontrada para esta linha.")
+
+    if veiculos:
+        for v in veiculos:
+            try:
+                lat, lon = float(v["py"]), float(v["px"])
+                folium.Marker(location=[lat, lon], popup=v.get("p",""), icon=folium.Icon(color="red", icon="car")).add_to(mapa)
+            except:
+                continue
+    else:
+        print("Nenhum veículo ativo encontrado para esta linha.")
+
+    pontos = [(float(p["py"]), float(p["px"])) for p in paradas if p.get("py") and p.get("px")]
+    if pontos:
+        mapa.fit_bounds(mapa.get_bounds())
+    else:
+        mapa.fit_bounds([[-23.55, -46.63], [-23.55, -46.63]])
+
+    arquivo = f"mapa_linha_{linha}.html"
+    mapa.save(arquivo)
+
+
+if __name__ == "__main__":
+    gerar_mapa("701A-10")
+
+```
+
+<iframe src="mapa_linha_701A-10.html" width="100%" height="600"></iframe>
